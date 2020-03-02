@@ -2,12 +2,14 @@
 // See the COPYRIGHT file at the top-level directory of this distribution.
 // Licensed under the MIT license, see the LICENSE file or <http://opensource.org/licenses/MIT>
 
-use ::glib_macros::{GBoxed, GEnum};
+use ::glib_macros::{GBoxed, GEnum, GFlags};
 use glib::prelude::*;
 use glib::subclass::prelude::*;
 use glib::translate::{FromGlib, ToGlib};
 #[macro_use]
 extern crate glib;
+#[macro_use]
+extern crate bitflags;
 
 #[test]
 fn derive_genum() {
@@ -72,4 +74,42 @@ fn derive_gboxed() {
     let v = b.to_value();
     let b2 = v.get::<&MyBoxed>().unwrap().unwrap();
     assert_eq!(&b, b2);
+}
+
+#[test]
+fn derive_gflags() {
+    bitflags! {
+        #[derive(GFlags)]
+        #[gflags(type_name = "MyFlags")]
+        struct MyFlags: u32 {
+            const A = 0b00000001;
+            const B = 0b00000010;
+            const AB = Self::A.bits | Self::B.bits;
+        }
+    }
+
+    assert_eq!(MyFlags::empty().to_glib(), 0);
+    assert_eq!(MyFlags::A.to_glib(), 1);
+    assert_eq!(MyFlags::B.to_glib(), 2);
+    assert_eq!(MyFlags::AB.to_glib(), 3);
+
+    assert_eq!(MyFlags::from_glib(0), MyFlags::empty());
+    assert_eq!(MyFlags::from_glib(1), MyFlags::A);
+    assert_eq!(MyFlags::from_glib(2), MyFlags::B);
+    assert_eq!(MyFlags::from_glib(3), MyFlags::AB);
+
+    assert_eq!(
+        MyFlags::empty().to_value().get::<MyFlags>(),
+        Ok(Some(MyFlags::empty()))
+    );
+    assert_eq!(MyFlags::A.to_value().get::<MyFlags>(), Ok(Some(MyFlags::A)));
+    assert_eq!(MyFlags::B.to_value().get::<MyFlags>(), Ok(Some(MyFlags::B)));
+    assert_eq!(
+        MyFlags::AB.to_value().get::<MyFlags>(),
+        Ok(Some(MyFlags::AB))
+    );
+
+    let t = MyFlags::static_type();
+    assert!(t.is_a(&glib::Type::BaseFlags));
+    assert_eq!(t.name(), "MyFlags");
 }

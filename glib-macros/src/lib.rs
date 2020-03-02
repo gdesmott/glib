@@ -6,6 +6,7 @@ extern crate proc_macro;
 
 mod gboxed_derive;
 mod genum_derive;
+mod gflags_derive;
 mod utils;
 
 use proc_macro_error::proc_macro_error;
@@ -41,5 +42,13 @@ pub fn genum_derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 pub fn gboxed_derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     let gen = gboxed_derive::impl_gboxed(&input);
+    gen.into()
+}
+
+#[proc_macro_derive(GFlags, attributes(gflags))]
+#[proc_macro_error]
+pub fn gflags_derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    let input = parse_macro_input!(input as DeriveInput);
+    let gen = gflags_derive::impl_gflags(&input);
     gen.into()
 }
