@@ -112,4 +112,9 @@ fn derive_gflags() {
     let t = MyFlags::static_type();
     assert!(t.is_a(&glib::Type::BaseFlags));
     assert_eq!(t.name(), "MyFlags");
+
+    let e = glib::FlagsClass::new(t).expect("FlagsClass::new failed");
+    let v = e.get_value(0).expect("FlagsClass::get_value(0) failed");
+    assert_eq!(v.get_name(), "A");
+    assert_eq!(v.get_nick(), "A");
 }

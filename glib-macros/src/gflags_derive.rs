@@ -109,7 +109,7 @@ pub fn impl_gflags(input: &syn::DeriveInput) -> TokenStream {
 
     let struct_fields = match input.data {
         Data::Struct(ref e) => &e.fields,
-        _ => abort_call_site!("GEnum only supports enums"),
+        _ => abort_call_site!("GFlags only supports structs"),
     };
 
     let gtype_name = match parse_type_name(&input, "gflags") {
