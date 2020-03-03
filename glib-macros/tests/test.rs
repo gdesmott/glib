@@ -2,7 +2,7 @@
 // See the COPYRIGHT file at the top-level directory of this distribution.
 // Licensed under the MIT license, see the LICENSE file or <http://opensource.org/licenses/MIT>
 
-use ::glib_macros::{GBoxed, GEnum, GFlags};
+use ::glib_macros::{GBoxed, GEnum};
 use glib::prelude::*;
 use glib::subclass::prelude::*;
 use glib::translate::{FromGlib, ToGlib};
@@ -76,14 +76,109 @@ fn derive_gboxed() {
     assert_eq!(&b, b2);
 }
 
+macro_rules! gflags {
+    (
+        #[gflags(type_name = $TypeName:literal)]
+        struct $Name:ident: $T:ty {
+            $(
+                #[gflags(name = $Gname:literal, nick = $Nick:literal)]
+                const $Flag:ident = $value:expr;
+            )+
+        }
+    ) => {
+        bitflags!{
+            struct $Name: $T {
+                $(
+                    const $Flag = $value;
+                )+
+            }
+        }
+
+        impl glib::translate::ToGlib for $Name {
+            type GlibType = $T;
+
+            fn to_glib(&self) -> $T {
+                self.bits()
+            }
+        }
+
+        impl glib::translate::FromGlib<u32> for $Name {
+            fn from_glib(value: $T) -> Self {
+                $Name::from_bits_truncate(value)
+            }
+        }
+
+        impl<'a> glib::value::FromValueOptional<'a> for $Name {
+            unsafe fn from_value_optional(value: &glib::Value) -> Option<Self> {
+                Some(glib::value::FromValue::from_value(value))
+            }
+        }
+
+        impl<'a> glib::value::FromValue<'a> for $Name {
+            unsafe fn from_value(value: &glib::Value) -> Self {
+                glib::translate::from_glib(
+                    gobject_sys::g_value_get_flags(
+                        glib::translate::ToGlibPtr::to_glib_none(value).0))
+            }
+        }
+
+        impl glib::value::SetValue for $Name {
+            unsafe fn set_value(value: &mut glib::Value, this: &Self) {
+                gobject_sys::g_value_set_flags(
+                    glib::translate::ToGlibPtrMut::to_glib_none_mut(value).0,
+                    glib::translate::ToGlib::to_glib(this))
+            }
+        }
+
+        impl StaticType for $Name {
+            fn static_type() -> glib::Type {
+              static ONCE: std::sync::Once = std::sync::Once::new();
+              static mut TYPE: glib::Type = glib::Type::Invalid;
+
+              ONCE.call_once(|| {
+                  // FIXME: hardcoded array size
+                  static mut VALUES: [gobject_sys::GFlagsValue; 4] = [
+                      $(
+                          gobject_sys::GFlagsValue {
+                              value: 1,
+                              // FIXME: both strings should be \0 terminated
+                              value_name: $Gname as *const _ as *const _,
+                              value_nick: $Nick as *const _ as *const _,
+                          },
+                      )+
+                      gobject_sys::GFlagsValue {
+                          value: 0,
+                          value_name: std::ptr::null(),
+                          value_nick: std::ptr::null(),
+                      },
+                  ];
+
+                  let name = std::ffi::CString::new($TypeName).expect("CString::new failed");
+                  unsafe {
+                      let type_ = gobject_sys::g_flags_register_static(name.as_ptr(), VALUES.as_ptr());
+                      TYPE = glib::translate::from_glib(type_);
+                  }
+              });
+
+              unsafe {
+                  assert_ne!(TYPE, glib::Type::Invalid);
+                  TYPE
+              }
+            }
+        }
+    };
+}
+
 #[test]
 fn derive_gflags() {
-    bitflags! {
-        #[derive(GFlags)]
+    gflags! {
         #[gflags(type_name = "MyFlags")]
         struct MyFlags: u32 {
+            #[gflags(name = "Flag A", nick = "A")]
             const A = 0b00000001;
+            #[gflags(name = "Flag B", nick = "B")]
             const B = 0b00000010;
+            #[gflags(name = "Flag A and B", nick = "A-B")]
             const AB = Self::A.bits | Self::B.bits;
         }
     }
@@ -117,10 +212,8 @@ fn derive_gflags() {
     assert!(t.is_a(&glib::Type::BaseFlags));
     assert_eq!(t.name(), "MyFlags");
 
-    /*
     let e = glib::FlagsClass::new(t).expect("FlagsClass::new failed");
-    let v = e.get_value(0).expect("FlagsClass::get_value(0) failed");
-    assert_eq!(v.get_name(), "A");
+    let v = e.get_value(1).expect("FlagsClass::get_value(1) failed");
+    assert_eq!(v.get_name(), "Flag A");
     assert_eq!(v.get_nick(), "A");
-    */
 }
