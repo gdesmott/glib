@@ -2,54 +2,13 @@
 // See the COPYRIGHT file at the top-level directory of this distribution.
 // Licensed under the MIT license, see the LICENSE file or <http://opensource.org/licenses/MIT>
 
-use anyhow::{bail, Result};
-use heck::{CamelCase, KebabCase, SnakeCase};
-use itertools::Itertools;
+use heck::SnakeCase;
 use proc_macro2::TokenStream;
 use proc_macro_error::abort_call_site;
-use quote::{format_ident, quote, quote_spanned};
-use syn::{
-    punctuated::Punctuated, spanned::Spanned, token::Comma, Attribute, Data, Fields, Ident,
-    NestedMeta, Variant,
-};
+use quote::{format_ident, quote};
+use syn::{Data, Fields, Ident};
 
-use crate::utils::{find_attribute_meta, parse_attribute, parse_type_name};
-
-#[derive(Debug)]
-enum ItemAttribute {
-    Name(String),
-    Nick(String),
-}
-
-fn parse_item_attribute(meta: &NestedMeta) -> Result<ItemAttribute> {
-    let (ident, v) = parse_attribute(meta)?;
-
-    match ident.as_ref() {
-        "name" => Ok(ItemAttribute::Name(v)),
-        "nick" => Ok(ItemAttribute::Nick(v)),
-        s => bail!("Unknown item meta {}", s),
-    }
-}
-
-// Parse optional enum item attributes such as:
-// #[genum(name = "My Name", nick = "my-nick")]
-fn parse_item_attributes(attrs: &[Attribute]) -> Result<Vec<ItemAttribute>> {
-    let meta = find_attribute_meta(attrs, "genum")?;
-
-    let v = match meta {
-        Some(meta) => meta
-            .nested
-            .iter()
-            .map(|m| parse_item_attribute(&m))
-            .fold_results(Vec::new(), |mut v, a| {
-                v.push(a);
-                v
-            })?,
-        None => Vec::new(),
-    };
-
-    Ok(v)
-}
+use crate::utils::parse_type_name;
 
 // Generate gobject_sys::GEnumValue structs mapping the enum such as:
 //     gobject_sys::GEnumValue {
@@ -57,7 +16,7 @@ fn parse_item_attributes(attrs: &[Attribute]) -> Result<Vec<ItemAttribute>> {
 //         value_name: "Goat\0" as *const _ as *const _,
 //         value_nick: "goat\0" as *const _ as *const _,
 //     },
-fn gen_genum_values(struct_name: &Ident, struct_fields: &Fields) -> (TokenStream, usize) {
+fn gen_genum_values(_struct_name: &Ident, _struct_fields: &Fields) -> (TokenStream, usize) {
     /*
     // start at one as GEnumValue array is null-terminated
     let mut n = 1;
